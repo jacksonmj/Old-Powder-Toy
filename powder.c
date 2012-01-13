@@ -1705,12 +1705,15 @@ int main(int argc, char *argv[])
 			state_save("save.bin");
 		if(sdl_key=='l')
 			state_load("save.bin");
+
+#ifdef FRAMEDUMP
 		if(sdl_key=='p')
 			dump_frame(vid_buf, XRES, YRES, XRES*4);
 		if(sdl_key=='v')
 			vs = !vs;
 		if(vs)
 			dump_frame(vid_buf, XRES, YRES, XRES*4);
+#endif
 
 		b = SDL_GetMouseState(&x, &y);
 		mk = SDL_GetModState();
