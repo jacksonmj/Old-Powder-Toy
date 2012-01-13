@@ -6,8 +6,8 @@
 
 #undef PLOSS
 #define FLAG_STAGNANT 1
-#define XRES	480
-#define YRES	232
+#define XRES	512
+#define YRES	384
 #define CELL    4
 #define ISTP    (CELL/2)
 #define CFDS 	(4.0f/CELL)
@@ -16,9 +16,10 @@ char *it_msg =
     "\x7F\x7F\x7F\x7F\x7F\x7F\x7F\x7F\x7F\x7F\x7F\x7F\x7F\x7F\x7F\x7F\x7F\x7F\x7F\n"
     "\bwMaterials on the bottom right are walls, materials on the bottom left are particles.\n"
     "\n"
-    "Pick your material from the bottom bar using the square and circle buttons.\n"
-    "Draw freeform lines by using the right trigger and joystick.\n"
-    "The left trigger draws straight lines, and the triangle button draws boxes.\n"
+    "Pick your material from the bottom bar using mouse left/right buttons.\n"
+    "Draw freeform lines by dragging your mouse left/right button across the drawing area.\n"
+    "Shift+drag will create straight lines of particles.\n"
+    "Ctrl+drag will result in filled rectangles.\n"
     "\n"
     "\bg(c) 2008 Stanislaw K Skowronek   \bbirc.unaligned.org #wtf\n"
     ;
@@ -181,7 +182,7 @@ void draw_air(unsigned *vid)
  *                   PARTICLE SIMULATOR                    *
  ***********************************************************/
 
-#define NPART 16384
+#define NPART 65535
 
 #define PT_NONE	0
 #define PT_DUST	1
