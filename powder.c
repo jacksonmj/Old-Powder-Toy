@@ -3,19 +3,12 @@
 #include <string.h>
 #include <math.h>
 #include <SDL/SDL.h>
-#ifdef PSP
-#include <pspkernel.h>
-#include <psptypes.h>
-PSP_HEAP_SIZE_KB(-1024);
-PSP_MAIN_THREAD_ATTR(PSP_THREAD_ATTR_VFPU);
-#endif
 
 #undef PLOSS
 #define FLAG_STAGNANT 1
 #define XRES	480
 #define YRES	232
-#define RAND_MAX 2147483648
-#define CELL    8
+#define CELL    4
 #define ISTP    (CELL/2)
 #define CFDS 	(4.0f/CELL)
 char *it_msg =
@@ -28,9 +21,6 @@ char *it_msg =
     "The left trigger draws straight lines, and the triangle button draws boxes.\n"
     "\n"
     "\bg(c) 2008 Stanislaw K Skowronek   \bbirc.unaligned.org #wtf\n"
-#ifdef PSP
-    "\bgPSP Port (c) 2008 Brian Ledbetter"
-#endif
     ;
 
 /***********************************************************
@@ -58,15 +48,7 @@ void make_kernel(void)
 	    kernel[(i+1)+3*(j+1)] = exp(-5.0f*(i*i+j*j));
 	    s += kernel[(i+1)+3*(j+1)];
 	}
-   #ifdef VFPU
-    __asm__ volatile (
-        "mtv %1, S000\n"
-        "vrcp.s  S000, S000\n"
-         "mfv     %0, S000\n"
-         : "=r"(s) : "r"(s));
-    #else
     s = 1.0f / s;
-    #endif
     for(j=-1; j<2; j++)
 	for(i=-1; i<2; i++)
 	    kernel[(i+1)+3*(j+1)] *= s;
@@ -76,68 +58,8 @@ void update_air(void)
 {
     int x, y, i, j;
     float dp, dx, dy, f, tx, ty;
-  #ifdef VFPU
-    ScePspFVector4 ploss = {PLOSS, PLOSS, PLOSS, PLOSS};
-    ScePspFVector4 tstepp = {TSTEPP, TSTEPP, TSTEPP, TSTEPP};
-    ScePspFVector4 vloss = {VLOSS, VLOSS, VLOSS, VLOSS};
-    ScePspFVector4 tstepv = {TSTEPV, TSTEPV, TSTEPV, TSTEPV};
-    #endif
 
     for(y=1; y<YRES/CELL; y++) {
-        #ifdef VFPU
-        for(x=1; x<XRES/CELL-4; x+=4) {
-        ScePspFVector4 vxyx = {vx[y][x], vx[y][x+1], vx[y][x+2], vx[y][x+3]};
-        ScePspFVector4 vxyxm1 = {vx[y][x-1], vx[y][x], vx[y][x+1], vx[y][x+2]};
-        ScePspFVector4 vyyx = {vy[y][x], vy[y][x+1], vy[y][x+2], vy[y][x+3]};
-        ScePspFVector4 vyyxm1 = {vy[y-1][x], vy[y-1][x+1], vy[y-1][x+2], vy[y-1][x+3]};
-        ScePspFVector4 pvyx = {pv[y][x], pv[y][x+1], pv[y][x+2], pv[y][x+3]};
-        __asm__ volatile (
-                "lv.q C100, %1\n"
-                "lv.q C110, %2\n"
-                "lv.q C120, %3\n"
-                "lv.q C130, %4\n"
-                "vsub.q C100, C110, C100\n"
-                "vsub.q C110, C130, C120\n"
-                "lv.q C120, %5\n"
-                "lv.q C130, %6\n"
-                "vadd.q C100, C100, C110\n"
-                "lv.q C110, %0\n"
-                "vmul.q C110, C120, C110\n"
-                "vmul.q C100, C130, C100\n"
-                "vadd.q C100, C110, C100\n"
-                "sv.q C100, %0\n"
-         : "+m"(pvyx) : "m"(vxyx), "m"(vxyxm1), "m"(vyyx), "m"(vyyxm1), "m"(ploss), "m"(tstepp));
-        pv[y][x] = pvyx.x;
-        pv[y][x+1] = pvyx.y;
-        pv[y][x+2] = pvyx.z;
-        pv[y][x+3] = pvyx.w;
-        }
-	x = XRES/CELL-3;	
-        ScePspFVector4 vxyx = {vx[y][x], vx[y][x+1], vx[y][x+2], 0.0f};
-        ScePspFVector4 vxyxm1 = {vx[y][x-1], vx[y][x], vx[y][x+1], vx[y][x+2]};
-        ScePspFVector4 vyyx = {vy[y][x], vy[y][x+1], vy[y][x+2], 0.0f};
-        ScePspFVector4 vyyxm1 = {vy[y-1][x], vy[y-1][x+1], vy[y-1][x+2], 0.0f};
-        ScePspFVector4 pvyx = {pv[y][x], pv[y][x+1], pv[y][x+2], 0.0f};
-        __asm__ volatile (
-                "lv.q C100, %1\n"
-                "lv.q C110, %2\n"
-                "lv.q C120, %3\n"
-                "lv.q C130, %4\n"
-                "vsub.q C100, C110, C100\n"
-                "vsub.q C110, C130, C120\n"
-                "lv.q C120, %5\n"
-                "lv.q C130, %6\n"
-                "vadd.q C100, C100, C110\n"
-                "lv.q C110, %0\n"
-                "vmul.q C110, C120, C110\n"
-                "vmul.q C100, C130, C100\n"
-                "vadd.q C100, C110, C100\n"
-                "sv.q C100, %0\n"
-         : "+m"(pvyx) : "m"(vxyx), "m"(vxyxm1), "m"(vyyx), "m"(vyyxm1), "m"(ploss), "m"(tstepp));
-        pv[y][x] = pvyx.x;
-        pv[y][x+1] = pvyx.y;
-        pv[y][x+2] = pvyx.z;
-	#else
 	for(x=1; x<XRES/CELL; x++) {
 	    dp = 0.0f;
 	    dp += vx[y][x-1] - vx[y][x];
@@ -145,95 +67,8 @@ void update_air(void)
 	    pv[y][x] *= PLOSS;
 	    pv[y][x] += dp*TSTEPP;
 	}
-	#endif
     }
     for(y=0; y<YRES/CELL-1; y++) {
-	#ifdef VFPU
-	        for(x=0; x<XRES/CELL-4; x+=4) {
-            ScePspFVector4 pvyx = {pv[y][x], pv[y][x+1], pv[y][x+2], pv[y][x+3]};
-            ScePspFVector4 pvyxp1 = {pv[y][x+1], pv[y][x+2], pv[y][x+3], pv[y][x+4]};
-            ScePspFVector4 pvyp1x = {pv[y+1][x], pv[y+1][x+1], pv[y+1][x+2], pv[y+1][x+3]};
-	    ScePspFVector4 vxyx = {vx[y][x], vx[y][x+1], vx[y][x+2], vx[y][x+3]};
-            ScePspFVector4 vyyx = {vy[y][x], vy[y][x+1], vy[y][x+2], vy[y][x+3]};
-        __asm__ volatile (
-                "lv.q C100, %2\n"
-                "lv.q C110, %3\n"
-                "lv.q C120, %4\n"
-                "vsub.q C110,C100,C110\n" // C110 = dx
-                "vsub.q C120,C100,C120\n" // C120 = dy
-                "lv.q C100, %0\n"
-                "lv.q C130, %1\n"
-                "lv.q C200, %5\n"
-                "lv.q C210, %6\n"
-                "vmul.q C100, C200, C100\n" // vx * vloss
-                "vmul.q C130, C200, C130\n" // vy * vloss
-                "vmul.q C110, C210, C110\n" // dx * tstepv
-                "vmul.q C120, C210, C120\n" // dy * tstepv
-                "vadd.q C100, C110, C100\n" // vx + dx
-                "vadd.q C130, C120, C130\n" // vy + dy
-                "sv.q C100, %0\n"
-                "sv.q C130, %1\n"
-        : "+m"(vxyx), "+m"(vyyx) : "m"(pvyx), "m"(pvyxp1), "m"(pvyp1x), "m"(vloss), "m"(tstepv));
-        vx[y][x] = vxyx.x;
-        vx[y][x+1] = vxyx.y;
-        vx[y][x+2] = vxyx.z;
-        vx[y][x+3] = vxyx.w;
-        vy[y][x] = vyyx.x;
-        vy[y][x+1] = vyyx.y;
-        vy[y][x+2] = vyyx.z;
-        vy[y][x+3] = vyyx.w;
-        for(i=0;i<4;i++) {
-                if(bmap[y][x+i] == 1 || bmap[y][x+i+1] == 1) {
-                        vx[y][x+i] = 0;
-                }
-                if(bmap[y][x+i] == 1 || bmap[y+1][x+i] == 1) {
-                        vy[y][x+i] = 0;
-                }
-        }
-	}
-	x = XRES/CELL - 4;
-	 ScePspFVector4 pvyx = {pv[y][x], pv[y][x+1], pv[y][x+2], 0};
-            ScePspFVector4 pvyxp1 = {pv[y][x+1], pv[y][x+2], pv[y][x+3], 0};
-            ScePspFVector4 pvyp1x = {pv[y+1][x], pv[y+1][x+1], pv[y+1][x+2], 0};
-            ScePspFVector4 vxyx = {vx[y][x], vx[y][x+1], vx[y][x+2], 0};
-            ScePspFVector4 vyyx = {vy[y][x], vy[y][x+1], vy[y][x+2], 0};
-        __asm__ volatile (
-                "lv.q C100, %2\n"
-                "lv.q C110, %3\n"
-                "lv.q C120, %4\n"
-                "vsub.q C110,C100,C110\n" // C110 = dx
-                "vsub.q C120,C100,C120\n" // C120 = dy
-                "lv.q C100, %0\n"
-                "lv.q C130, %1\n"
-                "lv.q C200, %5\n"
-                "lv.q C210, %6\n"
-                "vmul.q C100, C200, C100\n" // vx * vloss
-                "vmul.q C130, C200, C130\n" // vy * vloss
-                "vmul.q C110, C210, C110\n" // dx * tstepv
-                "vmul.q C120, C210, C120\n" // dy * tstepv
-                "vadd.q C100, C110, C100\n" // vx + dx
-                "vadd.q C130, C120, C130\n" // vy + dy
-                "sv.q C100, %0\n"
-                "sv.q C130, %1\n"
-        : "+m"(vxyx), "+m"(vyyx) : "m"(pvyx), "m"(pvyxp1), "m"(pvyp1x), "m"(vloss), "m"(tstepv));
-        vx[y][x] = vxyx.x;
-        vx[y][x+1] = vxyx.y;
-        vx[y][x+2] = vxyx.z;
-        vy[y][x] = vyyx.x;
-        vy[y][x+1] = vyyx.y;
-        vy[y][x+2] = vyyx.z;
-        for(i=0;i<4;i++) {
-                if(bmap[y][x+i] == 1 || bmap[y][x+i+1] == 1) {
-                        vx[y][x+i] = 0;
-                }
-                if(bmap[y][x+i] == 1 || bmap[y+1][x+i] == 1) {
-                        vy[y][x+i] = 0;
-                }
-        }
-
-}
-
-	#else
 	for(x=0; x<XRES/CELL-1; x++) {
 	    dx = dy = 0.0f;
 	    dx += pv[y][x] - pv[y][x+1];
@@ -248,7 +83,6 @@ void update_air(void)
 		vy[y][x] = 0;
 	}
 }
-	#endif
 	
 
     for(y=0; y<YRES/CELL; y++)
@@ -831,30 +665,15 @@ int create_part(int p, int x, int y, int t)
     parts[i].life = 0;
     parts[i].ctype = 0;
     if(t==PT_FIRE)
-	parts[i].life = psp_rand()%50+120;
+	parts[i].life = rand()%50+120;
     if(t==PT_LAVA)
-	parts[i].life = psp_rand()%120+240;
+	parts[i].life = rand()%120+240;
     if(t==PT_NEUT) {
-	float r = (psp_rand()%128+128)/127.0f;
-	float a = (psp_rand()%360)*3.14159f/180.0f;
-	parts[i].life = psp_rand()%120+480;
-        #ifdef VFPU
-        __asm__ volatile (
-        "mtv %2, S000\n"
-        "mtv %3, S001\n"
-        "vcst.s  S002, VFPU_2_PI\n"
-        "vmul.s  S000, S000, S002\n"
-        "vcos.s  S003, S000\n"
-        "vsin.s  S000, S000\n"
-        "vmul.s S000, S000, S001\n"
-        "vmul.s S003, S003, S001\n"
-        "sv.s S003, %0\n"
-        "sv.s S000, %1\n"
-        : "=m"(parts[i].vx) , "=m"(parts[i].vy) : "r"(a) , "r"(r));
-        #else
+	float r = (rand()%128+128)/127.0f;
+	float a = (rand()%360)*3.14159f/180.0f;
+	parts[i].life = rand()%120+480;
         parts[i].vx = r*cos(a);
         parts[i].vy = r*sin(a);
-        #endif
     }
 
     pmap[y][x] = t|(i<<8);
@@ -898,7 +717,7 @@ void update_particles(unsigned *vid)
     float mv, dx, dy, ix, iy, lx, ly;
 
     memset(pmap, 0, sizeof(pmap));
-    r = psp_rand()%2;
+    r = rand()%2;
     for(j=0; j<NPART; j++) {
 	i = r ? (NPART-1-j) : j;
 	if(parts[i].type) {
@@ -973,7 +792,7 @@ void update_particles(unsigned *vid)
 	    }
 
 	    if((explosive[t]&2) && pv[y/CELL][x/CELL]>1.5f) {
-		parts[i].life = psp_rand()%80+180;
+		parts[i].life = rand()%80+180;
 		parts[i].type = PT_FIRE;
 		pv[y/CELL][x/CELL] += 0.25f * CFDS;
 		t = PT_FIRE;
@@ -986,7 +805,7 @@ void update_particles(unsigned *vid)
 		if(pv[y/CELL][x/CELL]>1.0f) {
 		    parts[i].vx += advection[t]*vx[y/CELL][x/CELL];
 		    parts[i].vy += advection[t]*vy[y/CELL][x/CELL];
-		    parts[i].life = psp_rand()%80+300;
+		    parts[i].life = rand()%80+300;
 		}
 	    } else {
 		parts[i].vx += advection[t]*vx[y/CELL][x/CELL];
@@ -994,8 +813,8 @@ void update_particles(unsigned *vid)
 	    }
 
 	    if(diffusion[t]) {
-		parts[i].vx += diffusion[t]*(psp_rand()/(0.5f*RAND_MAX)-1.0f);
-		parts[i].vy += diffusion[t]*(psp_rand()/(0.5f*RAND_MAX)-1.0f);
+		parts[i].vx += diffusion[t]*(rand()/(0.5f*RAND_MAX)-1.0f);
+		parts[i].vy += diffusion[t]*(rand()/(0.5f*RAND_MAX)-1.0f);
 	    }
 
 	    // interpolator
@@ -1049,7 +868,7 @@ void update_particles(unsigned *vid)
 		t = parts[i].type = PT_OILL;
 	    if(t==PT_ICEI && pv[y/CELL][x/CELL]>0.3f)
 		t = parts[i].type = PT_SNOW;
-	    if(t==PT_PLUT && 1>psp_rand()%100 && (1+(int)(5.0f*pv[y/CELL][x/CELL]))>(psp_rand()%1000)) {
+	    if(t==PT_PLUT && 1>rand()%100 && (1+(int)(5.0f*pv[y/CELL][x/CELL]))>(rand()%1000)) {
 		create_part(i, x, y, PT_NEUT);
 		t = PT_NEUT;
 	    }
@@ -1062,11 +881,11 @@ void update_particles(unsigned *vid)
 			    r = pmap[y+ny][x+nx];
 			    if((r>>8)>=NPART || !r)
 				continue;
-			    if((r&0xFF)==PT_WATR && 1>(psp_rand()%1000)) {
+			    if((r&0xFF)==PT_WATR && 1>(rand()%1000)) {
 				t = parts[i].type = PT_ICEI;
 				parts[r>>8].type = PT_ICEI;
 			    }
-			    if(t==PT_SNOW && (r&0xFF)==PT_WATR && 15>(psp_rand()%1000))
+			    if(t==PT_SNOW && (r&0xFF)==PT_WATR && 15>(rand()%1000))
 				t = parts[i].type = PT_WATR;
 			}
 	    }
@@ -1081,20 +900,20 @@ void update_particles(unsigned *vid)
 			    r = pmap[y+ny][x+nx];
 			    if((r>>8)>=NPART || !r)
 				continue;
-			    if((r&0xFF)==PT_PLUT && rt>(psp_rand()%1000)) {
+			    if((r&0xFF)==PT_PLUT && rt>(rand()%1000)) {
 				create_part(r>>8, x+nx, y+ny, PT_NEUT);
 				parts[r>>8].vx = 0.25f*parts[r>>8].vx + parts[i].vx;
 				parts[r>>8].vy = 0.25f*parts[r>>8].vy + parts[i].vy;
 				pv[y/CELL][x/CELL] += 2.00f * CFDS;
 				fe ++;
 			    }                           
-			if((r&0xFF)==PT_GUNP && 15>(psp_rand()%1000))
+			if((r&0xFF)==PT_GUNP && 15>(rand()%1000))
                                parts[r>>8].type = PT_DUST;
-                           if((r&0xFF)==PT_PLEX && 15>(psp_rand()%1000))
+                           if((r&0xFF)==PT_PLEX && 15>(rand()%1000))
                                parts[r>>8].type = PT_DFRM;
-                           if((r&0xFF)==PT_NITR && 15>(psp_rand()%1000))
+                           if((r&0xFF)==PT_NITR && 15>(rand()%1000))
                                parts[r>>8].type = PT_OILL;
-                           if((r&0xFF)==PT_OILL && 5>(psp_rand()%1000))
+                           if((r&0xFF)==PT_OILL && 5>(rand()%1000))
                                parts[r>>8].type = PT_GASS;
 
 			}
@@ -1113,18 +932,18 @@ void update_particles(unsigned *vid)
 			    rt = parts[r>>8].type;
 			    if((a || explosive[rt]) &&
 			       (t!=PT_LAVA || parts[i].life>0 || (rt!=PT_METL && rt!=PT_WIRE)) &&
-			       flammable[rt] && flammable[rt]>(psp_rand()%1000)) {
+			       flammable[rt] && flammable[rt]>(rand()%1000)) {
 				parts[r>>8].type = PT_FIRE;
-				parts[r>>8].life = psp_rand()%80+180;
+				parts[r>>8].life = rand()%80+180;
 				if(explosive[rt])
 				    pv[y/CELL][x/CELL] += 0.25f * CFDS;
 				continue;
 			    }
 			    if(t!=PT_SPRK && meltable[rt] &&
-			       meltable[rt]>(psp_rand()%1000)) {
+			       meltable[rt]>(rand()%1000)) {
 			        if(t!=PT_LAVA || parts[i].life>0) {
 				    parts[r>>8].type = PT_LAVA;
-				    parts[r>>8].life = psp_rand()%120+240;
+				    parts[r>>8].life = rand()%120+240;
 				} else {
 				    parts[i].life = 0;
 				    t = parts[i].type = rt;
@@ -1176,7 +995,7 @@ void update_particles(unsigned *vid)
 			       (pmap[y+ny][x+nx]&0xFF)!=0xFF)
 				parts[i].ctype = pmap[y+ny][x+nx]&0xFF;
 		} else
-		    create_part(-1, x+psp_rand()%3-1, y+psp_rand()%3-1, parts[i].ctype);
+		    create_part(-1, x+rand()%3-1, y+rand()%3-1, parts[i].ctype);
 	    }
 
 	    nx = (int)(parts[i].x+0.5f);
@@ -1203,7 +1022,7 @@ void update_particles(unsigned *vid)
 			parts[i].vx *= collision[t];
 			parts[i].vy *= collision[t];
 		    } else {
-			r = (psp_rand()%2)*2-1;
+			r = (rand()%2)*2-1;
 			if(ny!=y && try_move(i, x, y, x+r, ny)) {
 			    parts[i].x += r;
 			    parts[i].y = iy;
@@ -1275,7 +1094,7 @@ void update_particles(unsigned *vid)
 		    }
 		} else {
 		    parts[i].flags |= FLAG_STAGNANT;
-                    if(100>(psp_rand()%1000)) {
+                    if(100>(rand()%1000)) {
                         kill_part(i);
                         continue;
                     } else if(try_move(i, x, y, 2*x-nx, ny)) {
@@ -1357,9 +1176,6 @@ void update_particles(unsigned *vid)
 
 SDL_Surface *sdl_scrn;
 int sdl_key;
-#ifdef PSP
-SDL_Joystick *joy;
-#endif
 
 void sdl_open(void)
 {
@@ -1373,11 +1189,6 @@ void sdl_open(void)
         fprintf(stderr, "Creating window: %s\n", SDL_GetError());
         exit(1);
     }
-   #ifdef PSP
-    joy = SDL_JoystickOpen(0);
-    SDL_JoystickEventState(SDL_ENABLE);
-    #endif
-
 }
 
 void sdl_blit(int x, int y, int w, int h, unsigned int *src, int pitch)
@@ -1815,16 +1626,8 @@ void xor_line(int x1, int y1, int x2, int y2, unsigned *vid)
 
 char *tag = "(c) 2008 Stanislaw Skowronek";
 
-#ifdef PSP
-int SDL_main(int argc, char *argv[])
-#else
 int main(int argc, char *argv[])
-#endif
 {
-  #ifdef PSP
-        scePowerSetClockFrequency(333, 333, 166);
-    #endif
-
     unsigned *vid_buf = calloc(XRES*(YRES+40), sizeof(unsigned));
     int i, j, vs = 0;
     int x, y, b = 0, sl=1, sr=0, c, lb = 0, lx = 0, ly = 0, lm = 0, tx, ty;
@@ -1905,13 +1708,8 @@ int main(int argc, char *argv[])
 	if(vs)
 	    dump_frame(vid_buf, XRES, YRES, XRES*4);
 
-   #ifdef PSP
-        b = PSP_GetFakeMouseState(&x, &y, vid_buf, &sl, &sr);
-        mk = PSP_GetModState();
-        #else
-        b = SDL_GetMouseState(&x, &y);
-        mk = SDL_GetModState();
-        #endif
+	b = SDL_GetMouseState(&x, &y);
+	mk = SDL_GetModState();
 
 	if(y >= SCALE*YRES) {
 	    tx = (x/SCALE)/32;
@@ -2041,66 +1839,3 @@ int main(int argc, char *argv[])
     }
     return 0;
 }
-#ifdef PSP
-int b3 = 0;
-int b1 = 0;
-int PSP_GetFakeMouseState(int *x, int *y, unsigned *vid_buf, int *sl, int *sr) {
-        int jmx = *x;
-        int jmy = *y;
-        if(SDL_JoystickGetButton(joy, 9)) jmx = jmx + 3;
-        if(SDL_JoystickGetButton(joy, 7)) jmx = jmx - 3;
-        if(SDL_JoystickGetButton(joy, 6)) jmy = jmy + 3;
-        if(SDL_JoystickGetButton(joy, 8)) jmy = jmy - 3;
-        if(SDL_JoystickGetButton(joy, 3))
-        {
-                if(!b3) {
-                *sl = *sl - 1;
-                if(*sl > (int)(PT_NUM - 1) && *sl < 27) *sl = PT_NUM - 1;
-                if(*sl < 0) *sl = 0;
-                }
-                b3 = 1;
-        } else {
-                b3 = 0;
-        }
-        if(SDL_JoystickGetButton(joy, 1))
-        {
-                if(!b1) {
-                *sl = *sl + 1;
-                if(*sl > (int)(PT_NUM - 1) && *sl < 27) *sl = 27;
-                if(*sl > 31) *sl = 31;
-                }
-                b1 = 1;
-        } else {
-                b1 = 0;
-        }
-        jmx = jmx + (int)(SDL_JoystickGetAxis(joy, 0)/4096);
-        jmy = jmy + (int)(SDL_JoystickGetAxis(joy, 1)/4096);
-        if(jmx >= 480) jmx = 478;
-        if(jmx <= 0) jmx = 0;
-        if(jmy <= 0) jmy = 0;
-        if(jmy >= 272) jmy = 270;
-        *x = jmx;
-        *y = jmy;
-        drawchar(vid_buf,jmx, jmy, 0x80, 255, 255, 255, 200);
-        if(SDL_JoystickGetButton(joy, 5) || SDL_JoystickGetButton(joy, 0) || SDL_JoystickGetButton(joy, 4)) return SDL_BUTTON(1);
-        return 0;
-}
-int PSP_GetModState() {
-        if(SDL_JoystickGetButton(joy, 0)) return KMOD_CTRL;
-        if(SDL_JoystickGetButton(joy, 4)) return KMOD_SHIFT;
-        return 0;
-}
-inline int psp_rand() {
-#ifdef VFPU
-	int result;
-	__asm__ volatile (
-	"vrndi.s S000\n"
-	"mfv %0, S000\n"
-	: "=r"(result));
-	return (result ^ (result >> 31)) - (result >> 31);
-}
-#else
-	return rand();
-}
-#endif
-#endif
