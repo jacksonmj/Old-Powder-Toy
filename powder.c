@@ -1269,6 +1269,7 @@ void state_save(char *fn)
 {
 	unsigned sig = 0x54494853;
 	FILE *f = fopen(fn, "w");
+	if (!f) return;
 	fwrite(&sig, 1, 4, f);
 	fwrite(parts, NPART, sizeof(particle), f);
 	fwrite(bmap, 1, sizeof(bmap), f);
@@ -1279,6 +1280,7 @@ int state_load(char *fn)
 {
 	unsigned sig;
 	FILE *f = fopen(fn, "r");
+	if (!f) return 1;
 	fread(&sig, 1, 4, f);
 	if(sig != 0x54494853) {
 		fclose(f);
